@@ -17,8 +17,26 @@ chmod 600 key.pem
 [ -f cert.pem ] ||
     openssl x509 -req -in csr.pem -out cert.pem -signkey key.pem -days 36525
 
+[ -f udp53.conf ] || cat >udp53.conf <<EOF
+server 192.168.255.128 255.255.255.192
+verb 3
+duplicate-cn
+key key.pem
+ca cert.pem
+cert cert.pem
+dh dh.pem
+keepalive 10 60
+persist-key
+persist-tun
+
+proto udp
+port 53
+dev tun53
+status openvpn-status-53.log
+EOF
+
 [ -f tcp443.conf ] || cat >tcp443.conf <<EOF
-server 192.168.255.0 255.255.255.128
+server 192.168.255.64 255.255.255.192
 verb 3
 duplicate-cn
 key key.pem
@@ -36,7 +54,7 @@ status openvpn-status-443.log
 EOF
 
 [ -f udp1194.conf ] || cat >udp1194.conf <<EOF
-server 192.168.255.128 255.255.255.128
+server 192.168.255.0 255.255.255.192
 verb 3
 duplicate-cn
 key key.pem
@@ -86,6 +104,10 @@ remote $MY_IP_ADDR 1194 udp
 <connection>
 remote $MY_IP_ADDR 443 tcp-client
 </connection>
+
+<connection>
+remote $MY_IP_ADDR 53 udp
+</connection>
 EOF
 
 [ -f client.http ] || cat >client.http <<EOF
@@ -98,7 +120,8 @@ EOF
 
 iptables -t nat -A POSTROUTING -s 192.168.255.0/24 -o eth0 -j MASQUERADE
 
-touch tcp443.log udp1194.log http8080.log
+touch udp53.log tcp443.log udp1194.log http8080.log
+while true ; do openvpn udp53.conf ; done >> udp53.log &
 while true ; do openvpn tcp443.conf ; done >> tcp443.log &
 while true ; do openvpn udp1194.conf ; done >> udp1194.log &
 tail -F *.log
