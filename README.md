@@ -1,10 +1,20 @@
 # OpenVPN for Docker
 
+This is a slightly modified version of [jpetazzo/dockvpn](https://github.com/jpetazzo/dockvpn). It has an extra fallback port of 53/udp for networks, that block all other ports besides DNS (unless authorizing). You may need to disable host OS's dnsmasq's dns feature to get it working!
+
 Quick instructions:
 
+To disable dnsmasq's dns feature, open `nano /etc/init/lxc-net.conf` and add `--port=0` to the following line like shown:
 ```bash
-CID=$(docker run -d -privileged -p 1194:1194/udp -p 443:443/tcp jpetazzo/openvpn)
-docker run -t -i -p 8080:8080 -volumes-from $CID jpetazzo/openvpn serveconfig
+dnsmasq -u lxc-dnsmasq --strict-order --bind-interfaces --pid-file=${varrun}/dnsmasq.pid --conf-file= --listen-address ${LXC_ADDR} --port=0 --dhcp-range ${LXC_DHCP_RANGE} --dhcp-lease-max=${LXC_DHCP_MAX} --dhcp-no-override --except-interface=lo --interface=${LXC_BRIDGE} --dhcp-leasefile=/var/lib/misc/dnsmasq.${LXC_BRIDGE}.leases --dhcp-authoritative || cleanup
+```
+
+Restart `lxc-net` with `service lxc-net restart` and proceed:
+
+```bash
+docker build -t dockvpn github.com/Raidok/dockvpn
+CID=$(docker run -d -privileged -p 1194:1194/udp -p 443:443/tcp -p 53:53/udp dockvpn)
+docker run -t -i -p 8080:8080 -volumes-from $CID dockvpn serveconfig
 ```
 
 Now download the file located at the indicated URL. You will get a
